@@ -1718,7 +1718,8 @@ async function boot(){
   map.on('move zoom resize',redraw);
   map.on('moveend zoomend',()=>{if(F.view){clearTimeout(moveTimer);moveTimer=setTimeout(update,120);}});
   setBase();
-  if(DATA)addDataset({id:'embedded',name:DATA.name||'Apple Health export',records:DATA.workouts,persist:false});
+  if(DATA&&DATA.datasets)for(const d of DATA.datasets)addDataset({id:d.id,name:d.name,records:d.workouts,persist:false});
+  else if(DATA)addDataset({id:'embedded',name:DATA.name||'Apple Health export',records:DATA.workouts,persist:false});
   if(HAS_STORE){for(const s of await idb.all())if(!DS.some(d=>d.id===s.id))addDataset({id:s.id,name:s.name,records:s.records,persist:true});}
   rebuildAll(true);
   renderDsList();
