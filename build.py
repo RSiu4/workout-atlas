@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
-"""Build workout_dashboard.html from an Apple Health export zip.
+"""Optional: bake an Apple Health export into a copy of the app, so it opens with your routes already loaded.
 
-Usage:  python build.py [path/to/export.zip] [output.html]
-        python build.py --empty            (no data baked in: a shareable viewer where each user loads their own files)
+The app itself (index.html) needs no build: open it and use "Data..." to load files. Use this only
+if you want a ready-to-open personal copy.
 
-Reads Workout metadata from export.xml and the GPX files in workout-routes/
-directly from the zip (nothing is extracted), simplifies the routes and bakes
-everything into one self-contained HTML file next to this script.
+Usage:  python build.py                      # uses the zip in data/ (data/export.zip, or the only .zip there)
+        python build.py path/to/export.zip   # or give the export explicitly
+        python build.py export.zip out.html  # and choose the output file
+
+Output goes to dist/workout_atlas_personal.html by default. data/ and dist/ are git-ignored because
+they contain personal location data.
+
+Reads workout metadata from export.xml and the GPX files in workout-routes/ directly from the zip
+(nothing is extracted), simplifies the routes and writes one self-contained HTML file.
 """
 import sys, io, os, re, json, math, zipfile
 import datetime as dt
@@ -14,9 +20,23 @@ import xml.etree.ElementTree as ET
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ARGS = [a for a in sys.argv[1:] if not a.startswith('--')]
-EMPTY = '--empty' in sys.argv
-ZIP = ARGS[0] if ARGS else os.path.join(HERE, '..', 'data', 'health', 'export2.zip')
-OUT = ARGS[1] if len(ARGS) > 1 else os.path.join(HERE, 'workout_atlas_empty.html' if EMPTY else 'workout_dashboard.html')
+APP = os.path.join(HERE, 'index.html')
+
+
+def default_zip():
+    d = os.path.join(HERE, 'data')
+    pref = os.path.join(d, 'export.zip')
+    if os.path.exists(pref):
+        return pref
+    zips = [os.path.join(d, f) for f in os.listdir(d)] if os.path.isdir(d) else []
+    zips = [z for z in zips if z.lower().endswith('.zip')]
+    if len(zips) == 1:
+        return zips[0]
+    sys.exit('Put your Apple Health export.zip in data/ (as data/export.zip), or pass its path: python build.py path/to/export.zip')
+
+
+ZIP = ARGS[0] if ARGS else default_zip()
+OUT = ARGS[1] if len(ARGS) > 1 else os.path.join(HERE, 'dist', 'workout_atlas_personal.html')
 SIMPLIFY_M = 2.5          # route simplification tolerance in metres
 
 
@@ -82,11 +102,6 @@ def ts(s):
 
 
 def main():
-    if EMPTY:
-        html = open(os.path.join(HERE, 'template.html'), encoding='utf-8').read()
-        open(OUT, 'w', encoding='utf-8').write(html)
-        print(f'empty viewer -> {OUT}')
-        return
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     recs = []
     with zipfile.ZipFile(ZIP) as z:
@@ -138,7 +153,8 @@ def main():
 
     data = json.dumps(dict(workouts=recs, name='Apple Health export', built=dt.date.today().isoformat()),
                       separators=(',', ':'), ensure_ascii=False).replace('</', '<\\/')
-    html = open(os.path.join(HERE, 'template.html'), encoding='utf-8').read().replace('/*__DATA__*/null', data)
+    html = open(APP, encoding='utf-8').read().replace('/*__DATA__*/null', data)
+    os.makedirs(os.path.dirname(OUT), exist_ok=True)
     open(OUT, 'w', encoding='utf-8').write(html)
     print(f'{len(recs)} routes -> {OUT} ({os.path.getsize(OUT)/1e6:.2f} MB)')
 

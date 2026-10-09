@@ -17,7 +17,7 @@
 
 - **Other location formats.** Android's `Timeline.json` (`semanticSegments`) and the older Takeout
   `Records.json` (`locations` with `latitudeE7`) use different shapes. Add a converter next to
-  `importGoogleTimeline` in `template.html` that emits the same records.
+  `importGoogleTimeline` in `index.html` that emits the same records.
 - **Road-following paths.** The export has no road geometry; snapping trips to a road network would need
   an online routing service, which conflicts with keeping everything local.
 - **Privacy helpers.** Optionally blur or round home / work locations before saving to IndexedDB.

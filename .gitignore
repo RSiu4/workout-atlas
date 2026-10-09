@@ -1,9 +1,12 @@
-# Personal data and anything built from it. Never commit these.
-workout_dashboard.html
+# Personal location data and anything built from it. Never commit these.
+data/*
+!data/README.md
+dist/
 *.zip
 *.gpx
 *.json
-data/
+
+# tooling
 __pycache__/
 .claude/
 *.log

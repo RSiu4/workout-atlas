@@ -13,31 +13,35 @@ parsed in your browser; nothing is uploaded.
 
 ## Use it
 
-Open `workout_atlas_empty.html` in a browser (Chrome, Edge, Firefox or Safari), click **Data…** and add your files.
-Sources can be remembered in the browser (IndexedDB) so you only import once. The page needs an internet
-connection for the map library and tiles (Leaflet, Esri and OpenStreetMap), and for the zip reader (fflate) the first time you open a `.zip`.
+Open `index.html` in a browser (Chrome, Edge, Firefox or Safari), click **Data…** and add your files.
+Sources can be remembered in the browser (IndexedDB) so you only import once.
 
-### Optional: bake your data into the page
+The page needs an internet connection for the map library and tiles (Leaflet, Esri, OpenStreetMap),
+and for the zip reader (fflate) the first time you open a `.zip`.
 
-`build.py` reads an Apple Health export and writes a copy of the page with your routes embedded, so it opens ready to use:
+Because it is one static file, it also works on GitHub Pages or any static host: the host only serves
+the page, your files are read locally in your browser.
 
-```bash
-python build.py path/to/export.zip            # writes workout_dashboard.html
-python build.py --empty                       # writes workout_atlas_empty.html (no data, safe to share)
+## Repository layout
+
+```
+index.html        the whole app (HTML, CSS, JS)
+build.py          optional: bake an Apple Health export into a personal copy
+data/             your exports (git-ignored; see data/README.md)
+dist/             build output (git-ignored)
+docs/ROADMAP.md   what's done and what's next
 ```
 
-`workout_dashboard.html` contains your routes (and therefore where you live), so it is git-ignored. Don't publish it.
+### Optional: a personal copy that opens with your data already loaded
 
-## Files
+```bash
+python build.py                      # reads data/export.zip, writes dist/workout_atlas_personal.html
+python build.py path/to/export.zip   # or point at an export elsewhere
+```
 
-| File | |
-|---|---|
-| `template.html` | the whole app (HTML, CSS, JS) |
-| `build.py` | bakes an Apple Health export into the template, or writes the empty viewer |
-| `workout_atlas_empty.html` | built viewer with no data |
-| `ROADMAP.md` | what's done and what's next |
+`dist/workout_atlas_personal.html` contains your routes (and therefore where you live). It is git-ignored; don't publish it.
 
 ## Privacy
 
-Your data never leaves the browser. Do not commit exports (`*.zip`), location files (`*.json`),
-GPX files, or built pages that contain data; `.gitignore` excludes them.
+Your data never leaves the browser. `data/` and `dist/` are git-ignored, as are `*.zip`, `*.gpx` and `*.json`,
+so exports and built pages with data cannot be committed by accident. Check `git status` before pushing.
