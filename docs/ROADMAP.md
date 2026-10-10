@@ -23,3 +23,10 @@
 - **Privacy helpers.** Optionally blur or round home / work locations before saving to IndexedDB.
 - **Apple Significant Locations / iOS location.** iOS has no supported bulk export. A third-party logger's
   GPX export already works through the GPX importer.
+
+## Activity file formats
+
+- **Done:** GPX, TCX (Garmin Connect, Strava and others; TCX also carries the sport and calories), Apple Health `export.zip`.
+- **Not done:** FIT, the binary format of Garmin bulk exports and Strava's `.fit.gz`. A parser would live next to
+  `processTcx` in `index.html` and emit the same track summary. Selections containing `.fit` files now say how many
+  were skipped, instead of ignoring them silently.

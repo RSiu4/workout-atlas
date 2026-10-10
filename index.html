@@ -391,8 +391,8 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
       <div><b>Add data</b><br><span class="hint">Drop a file or folder here, or choose one:</span></div>
       <div class="btns">
         <button class="btn primary" id="pickZip">Apple Health export (.zip)</button>
-        <button class="btn" id="pickDir">Folder of GPX files…</button>
-        <button class="btn" id="pickGpx">GPX files…</button>
+        <button class="btn" id="pickDir">Folder of GPX / TCX files…</button>
+        <button class="btn" id="pickGpx">GPX / TCX files…</button>
         <button class="btn" id="pickJson">Location history (.json)…</button>
       </div>
       <div class="row" style="width:100%;max-width:420px"><label for="dsName" style="min-width:0">Name</label><input type="text" id="dsName" placeholder="e.g. Me, Partner, 2024 trip (optional)" style="flex:1"></div>
@@ -402,7 +402,7 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
     </div>
     <input type="file" id="zipIn" accept=".zip" hidden>
     <input type="file" id="dirIn" webkitdirectory multiple hidden>
-    <input type="file" id="gpxIn" accept=".gpx" multiple hidden>
+    <input type="file" id="gpxIn" accept=".gpx,.tcx" multiple hidden>
     <input type="file" id="jsonIn" accept=".json,application/json" hidden>
 
     <div>
@@ -411,9 +411,9 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
     </div>
 
     <div class="faq">
-      <details><summary>Which should I use: the .zip or a folder of GPX files?</summary>
+      <details><summary>Which should I use: the .zip or a folder of GPX / TCX files?</summary>
         <p><b>Apple Health export.zip</b> (Health app → profile picture → Export All Health Data) is the richest option: it carries the real activity type, Apple's distance and the exact local time zone of every workout. Reading it takes a minute or two because the zip holds a multi-gigabyte <code>export.xml</code> that has to be scanned; the page does this in a stream so memory stays small.</p>
-        <p><b>A folder of GPX files</b> (for example the <code>workout-routes</code> folder from an unzipped export, or a Strava / Garmin / Komoot bulk export) loads in seconds. GPX files carry no workout metadata, so the activity is taken from the file when it says so and otherwise guessed from average speed, and local time is estimated from longitude. If you pick an unzipped <code>apple_health_export</code> folder, the page also reads its <code>export.xml</code> and you get the full detail.</p>
+        <p><b>A folder of GPX or TCX files</b> (for example the <code>workout-routes</code> folder from an unzipped export, or a Strava / Garmin / Komoot bulk export) loads in seconds. Garmin Connect and Strava can export activities as GPX or TCX (TCX also carries the sport); FIT files are not supported yet. GPX files carry no workout metadata, so the activity is taken from the file when it says so and otherwise guessed from average speed, and local time is estimated from longitude. If you pick an unzipped <code>apple_health_export</code> folder, the page also reads its <code>export.xml</code> and you get the full detail.</p>
         <p><b>Location history (.json)</b> is your Google Timeline export (the <code>location-history.json</code> you get from the Maps app on your phone). It captures where you were outside workouts: each trip becomes a route coloured by mode (walking, cycling, car, transit, flight), each place you stayed becomes a point, and sparse location traces are kept as thin lines. Trips are straight lines from start to end because the export doesn't store the road taken. Place visits are hidden by default; tick “Visit” under Activity, or set Heat counts to “Time spent”, to see where your hours go. Load it as its own source so it stays separate from your workouts.</p>
         <p>To compare two people or two periods, import each as its own named source, then use the Compare tab.</p>
       </details>
@@ -511,7 +511,20 @@ function rdp(pts,eps){ // Douglas-Peucker on [lat,lon,...] tuples; returns indic
 
 /* ======================= importers ======================= */
 const SIMPLIFY_M=2.5;
-// GPX text → compact track summary (simplified, delta-encoded)
+// points [lat,lon,ele,tSec] → compact track summary (simplified, delta-encoded)
+function trackFromPts(pts,hint){
+  if(pts.length<2)return null;
+  let dist=0;for(let k=1;k<pts.length;k++)dist+=hav(pts[k-1][0],pts[k-1][1],pts[k][0],pts[k][1]);
+  const ele=pts.map(p=>p[2]),sm=new Array(ele.length);
+  for(let k=0;k<ele.length;k++){const a=Math.max(0,k-5),b=Math.min(ele.length-1,k+5);let s=0;for(let m=a;m<=b;m++)s+=ele[m];sm[k]=s/(b-a+1);}
+  let gain=0;for(let k=1;k<sm.length;k++)if(sm[k]>sm[k-1])gain+=sm[k]-sm[k-1];
+  const keep=rdp(pts,SIMPLIFY_M),kp=keep.map(k=>pts[k]);
+  const hasT=!isNaN(kp[0][3]);const t0=hasT?kp[0][3]:0;
+  const la=kp.map(p=>Math.round(p[0]*1e5)),lo=kp.map(p=>Math.round(p[1]*1e5)),tt=kp.map(p=>hasT?Math.round(p[3]-t0):0);
+  const flat=[la[0],lo[0],tt[0]];for(let k=1;k<kp.length;k++)flat.push(la[k]-la[k-1],lo[k]-lo[k-1],tt[k]-tt[k-1]);
+  const last=pts[pts.length-1][3];
+  return {km:dist/1000,gain:Math.round(gain),p:flat,t0:hasT?t0:null,elapsed:hasT&&!isNaN(last)?last-pts[0][3]:0,lat:pts[0][0],lon:pts[0][1],hint:hint||'',kcal:null,src:'GPX'};
+}
 function processGpx(text){
   const pts=[];let i=text.indexOf('<trkpt');
   while(i>=0){
@@ -525,19 +538,35 @@ function processGpx(text){
     }
     i=j;
   }
-  if(pts.length<2)return null;
-  let dist=0;for(let k=1;k<pts.length;k++)dist+=hav(pts[k-1][0],pts[k-1][1],pts[k][0],pts[k][1]);
-  const ele=pts.map(p=>p[2]),sm=new Array(ele.length);let run=0,lo0=0,hi0=-1;
-  for(let k=0;k<ele.length;k++){const a=Math.max(0,k-5),b=Math.min(ele.length-1,k+5);let s=0;for(let m=a;m<=b;m++)s+=ele[m];sm[k]=s/(b-a+1);}
-  let gain=0;for(let k=1;k<sm.length;k++)if(sm[k]>sm[k-1])gain+=sm[k]-sm[k-1];
-  const keep=rdp(pts,SIMPLIFY_M),kp=keep.map(k=>pts[k]);
-  const hasT=!isNaN(kp[0][3]);const t0=hasT?kp[0][3]:0;
-  const la=kp.map(p=>Math.round(p[0]*1e5)),lo=kp.map(p=>Math.round(p[1]*1e5)),tt=kp.map(p=>hasT?Math.round(p[3]-t0):0);
-  const flat=[la[0],lo[0],tt[0]];for(let k=1;k<kp.length;k++)flat.push(la[k]-la[k-1],lo[k]-lo[k-1],tt[k]-tt[k-1]);
   const th=/<type>([^<]*)<\/type>/.exec(text.substring(0,Math.min(text.length,6000)));
-  const last=pts[pts.length-1][3];
-  return {km:dist/1000,gain:Math.round(gain),p:flat,t0:hasT?t0:null,elapsed:hasT&&!isNaN(last)?last-pts[0][3]:0,lat:pts[0][0],lon:pts[0][1],hint:th?th[1]:''};
+  return trackFromPts(pts,th?th[1]:'');
 }
+// Garmin / Strava TCX (XML): one file can hold several activities; the Sport attribute gives the activity type
+function processTcx(text){
+  const out=[],blocks=text.split(/<Activity\b/);
+  if(blocks.length>1)blocks.shift();
+  for(const blk of blocks){
+    const sport=/^[^>]*\bSport="([^"]+)"/.exec(blk),pts=[];
+    let i=blk.indexOf('<Trackpoint');
+    while(i>=0){
+      const j=blk.indexOf('<Trackpoint',i+11),chunk=j<0?blk.substring(i):blk.substring(i,j);
+      const la=/<LatitudeDegrees>\s*([-\d.eE+]+)\s*</.exec(chunk),lo=/<LongitudeDegrees>\s*([-\d.eE+]+)\s*</.exec(chunk);
+      if(la&&lo){                                        // indoor trackpoints have no position
+        const el=/<AltitudeMeters>\s*([-\d.eE+]+)\s*</.exec(chunk),ti=/<Time>\s*([^<\s]+)\s*</.exec(chunk);
+        pts.push([+la[1],+lo[1],el?+el[1]:0,ti?Date.parse(ti[1])/1000:NaN]);
+      }
+      i=j;
+    }
+    const g=trackFromPts(pts,sport?sport[1]:'');
+    if(!g)continue;
+    let kc=0;for(const m of blk.matchAll(/<Calories>\s*(\d+)\s*</g))kc+=+m[1];
+    g.kcal=kc||null;g.src='TCX';out.push(g);
+  }
+  return out;
+}
+let importNote='';
+const fitCount=names=>[...names].filter(n=>/\.fit(\.gz)?$/i.test(n)).length;
+const fitNote=n=>n?`${n} .fit file${n>1?'s were':' was'} skipped (FIT is not supported yet; export GPX or TCX instead).`:'';
 function guessType(hint,km,minutes){
   const h=(hint||'').toLowerCase();
   if(/run/.test(h))return 'Running';if(/cycl|bik|ride/.test(h))return 'Cycling';if(/walk/.test(h))return 'Walking';if(/hik/.test(h))return 'Hiking';if(/swim/.test(h))return 'Swimming';
@@ -549,7 +578,7 @@ function recordFromGpxOnly(g){
   const minutes=g.elapsed/60,off=Math.round(g.lon/15)*60;
   const utc=g.t0!==null?g.t0:Date.now()/1000;
   return {type:guessType(g.hint,g.km,minutes),start:new Date((utc+off*60)*1000).toISOString().slice(0,19),off,dur:Math.round(minutes*100)/100,
-    km:Math.round(g.km*1000)/1000,gpsKm:Math.round(g.km*1000)/1000,gain:g.gain,kcal:null,src:'GPX',lat:r4(g.lat),lon:r4(g.lon),p:g.p};
+    km:Math.round(g.km*1000)/1000,gpsKm:Math.round(g.km*1000)/1000,gain:g.gain,kcal:g.kcal||null,src:g.src||'GPX',lat:r4(g.lat),lon:r4(g.lon),p:g.p};
 }
 const UNIT_KM={km:1,m:.001,mi:1.609344,yd:.0009144};
 const attrs=s=>{const o={};for(const m of s.matchAll(/(\w+)="([^"]*)"/g))o[m[1]]=m[2];return o;};
@@ -600,14 +629,23 @@ function assemble(workouts,gpx,status){
 }
 async function importZip(file,progress){
   await (window.fflate?0:loadScript('https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js'));
-  const gpx=new Map(),workouts=[];let xml=false,nG=0;
+  const gpx=new Map(),workouts=[],allNames=[];let xml=false,nG=0;
   const scanner=makeWorkoutScanner(t=>workouts.push(parseWorkoutBlock(t)));
   const unzip=new fflate.Unzip();unzip.register(fflate.UnzipInflate);
   let failure=null;
   unzip.onfile=f=>{
+    allNames.push(f.name);
     const base=f.name.split('/').pop();
     if(/(^|\/)export\.xml$/i.test(f.name)){xml=true;f.ondata=(e,c,fin)=>{if(e){failure=e;return;}scanner.push(c,fin);};f.start();}
-    else if(/\.gpx$/i.test(f.name)&&!base.startsWith('._')){const parts=[];f.ondata=(e,c,fin)=>{if(e){failure=e;return;}parts.push(c);if(fin){const g=processGpx(utf8.decode(concatBytes(parts)));parts.length=0;if(g){gpx.set(base,g);nG++;}}};f.start();}
+    else if(/\.(gpx|tcx)$/i.test(f.name)&&!base.startsWith('._')){
+      const isT=/\.tcx$/i.test(f.name),parts=[];
+      f.ondata=(e,c,fin)=>{if(e){failure=e;return;}parts.push(c);if(fin){
+        const txt=utf8.decode(concatBytes(parts));parts.length=0;
+        if(isT)processTcx(txt).forEach((g,k)=>{gpx.set(base+'#'+k,g);nG++;});
+        else{const g=processGpx(txt);if(g){gpx.set(base,g);nG++;}}
+      }};
+      f.start();
+    }
   };
   const CH=2<<20;
   for(let o=0;o<file.size;o+=CH){
@@ -617,13 +655,15 @@ async function importZip(file,progress){
     progress(Math.min(1,(o+CH)/file.size),`Reading zip… ${nG} routes, ${workouts.length} workouts found`);
     await tick();
   }
-  if(!gpx.size)throw new Error('No GPX routes found in this zip (looked for workout-routes/*.gpx).');
+  importNote=fitNote(fitCount(allNames));
+  if(!gpx.size)throw new Error(importNote?'No GPX or TCX routes found in this zip. '+importNote:'No GPX or TCX routes found in this zip (looked for workout-routes/*.gpx and *.tcx).');
   return assemble(xml?workouts:[],gpx,m=>progress(1,m));
 }
 async function importFiles(files,progress){
   const all=[...files];let xmlFile=all.find(f=>f.name.toLowerCase()==='export.xml');
-  const gpxFiles=all.filter(f=>/\.gpx$/i.test(f.name)&&!f.name.startsWith('._'));
-  if(!gpxFiles.length)throw new Error('No .gpx files found in your selection.');
+  const gpxFiles=all.filter(f=>/\.(gpx|tcx)$/i.test(f.name)&&!f.name.startsWith('._'));
+  importNote=fitNote(fitCount(all.map(f=>f.name)));
+  if(!gpxFiles.length)throw new Error(importNote?'No .gpx or .tcx files found in your selection. '+importNote:'No .gpx or .tcx files found in your selection.');
   const workouts=[];
   if(xmlFile){
     const scanner=makeWorkoutScanner(t=>workouts.push(parseWorkoutBlock(t)));
@@ -633,8 +673,10 @@ async function importFiles(files,progress){
   }
   const gpx=new Map();let last=performance.now();
   for(let i=0;i<gpxFiles.length;i++){
-    const g=processGpx(await gpxFiles[i].text());if(g)gpx.set(gpxFiles[i].name,g);
-    if(performance.now()-last>60){last=performance.now();progress((xmlFile?.5:0)+(xmlFile?.5:1)*(i+1)/gpxFiles.length,`Reading GPX… ${i+1} of ${gpxFiles.length}`);await tick();}
+    const txt=await gpxFiles[i].text();
+    if(/\.tcx$/i.test(gpxFiles[i].name))processTcx(txt).forEach((g,k)=>gpx.set(gpxFiles[i].name+'#'+k,g));
+    else{const g=processGpx(txt);if(g)gpx.set(gpxFiles[i].name,g);}
+    if(performance.now()-last>60){last=performance.now();progress((xmlFile?.5:0)+(xmlFile?.5:1)*(i+1)/gpxFiles.length,`Reading GPX / TCX… ${i+1} of ${gpxFiles.length}`);await tick();}
   }
   return assemble(workouts,gpx,m=>progress(1,m));
 }
@@ -1645,7 +1687,7 @@ let importing=false;
 async function runImport(label,work){
   if(importing)return;importing=true;
   const name=$('#dsName').value.trim()||label;
-  setStatus('Starting…');setProg(0);
+  setStatus('Starting…');setProg(0);importNote='';
   const t0=performance.now();
   try{
     const records=await work((f,msg)=>{setProg(f);setStatus(msg);});
@@ -1653,7 +1695,7 @@ async function runImport(label,work){
     const d={id:'u'+Date.now().toString(36)+(nextDs++),name,records,persist:$('#dsKeep').checked};
     addDataset(d);
     let saved=false;if(d.persist)saved=await idb.put({id:d.id,name:d.name,records:d.records,saved:Date.now()});
-    setProg(1);setStatus(`Added “${name}”: ${nf0.format(records.length)} items in ${((performance.now()-t0)/1000).toFixed(1)}s.${d.persist?(saved?' Saved in this browser.':' (Could not save in this browser; it will be gone when you close the tab.)'):''}`);
+    setProg(1);setStatus(`Added “${name}”: ${nf0.format(records.length)} items in ${((performance.now()-t0)/1000).toFixed(1)}s.${d.persist?(saved?' Saved in this browser.':' (Could not save in this browser; it will be gone when you close the tab.)'):''}${importNote?' '+importNote:''}`);
     $('#dsName').value='';
     rebuildAll(true);renderDsList();
   }catch(e){console.error(e);setStatus(e.message||String(e),true);setProg(null);}

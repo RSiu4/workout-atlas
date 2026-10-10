@@ -14,7 +14,7 @@ parsed in your browser; nothing is uploaded.
 - **Compare**: two people or two time periods, overlay or difference heatmap, stats table
 - **Blank map** option, and switchable place labels
 - **3D print export** (STL): your heatmap as a printable relief, or routes as raised lines on a plaque, with size, crop and per-trail exclusion
-- **Load your own data** in the page: Apple Health `export.zip`, a folder of `.gpx` files, or a Google Timeline `location-history.json`
+- **Load your own data** in the page: Apple Health `export.zip`, a folder of `.gpx` / `.tcx` files (Garmin Connect, Strava and others), or a Google Timeline `location-history.json`
 
 ### Compare two people or two periods
 
