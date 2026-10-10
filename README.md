@@ -13,6 +13,7 @@ parsed in your browser; nothing is uploaded.
 - **Play**: animate routes building up over time
 - **Compare**: two people or two time periods, overlay or difference heatmap, stats table
 - **Blank map** option, and switchable place labels
+- **3D print export** (STL): your heatmap as a printable relief, or routes as raised lines on a plaque, with size, crop and per-trail exclusion
 - **Load your own data** in the page: Apple Health `export.zip`, a folder of `.gpx` files, or a Google Timeline `location-history.json`
 
 ### Compare two people or two periods
@@ -29,6 +30,18 @@ and for the zip reader (fflate) the first time you open a `.zip`.
 
 Because it is one static file, it also works on GitHub Pages or any static host: the host only serves
 the page, your files are read locally in your browser.
+
+## 3D printing
+
+Click **3D print…** on the map toolbar. The export uses the current map view and filters, so pan, zoom and filter first.
+
+- **Heat relief**: height follows how often you went somewhere (logarithmic by default, so a one-off ride is still visible next to your busiest road).
+- **Raised routes**: every route is a raised line of fixed width on a flat plaque.
+- **Size**: set the longest side up to your bed size (default 250 mm); crop the view with the four trim sliders.
+- **Leave out trails**: untick routes in the list, or use **Leave out of 3D print** on a selected route.
+- **Detail**: 0.7 / 0.5 / 0.35 mm cells (about 150k to 600k triangles for a 200 mm model).
+
+The file is a watertight STL (flat base, solid walls). Keep ridges at least 1 mm wide for a 0.4 mm nozzle. Everything is generated in your browser.
 
 ## Repository layout
 

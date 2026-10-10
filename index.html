@@ -207,6 +207,22 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
 .faq p{margin:4px 0 8px}
 .faq code{background:var(--wash);padding:1px 4px;border-radius:4px}
 
+/* 3D print export */
+#dlg3d{width:min(980px,96vw)}
+.x3{display:grid;grid-template-columns:minmax(300px,1fr) 340px;gap:18px;align-items:start}
+.x3 .pv{position:sticky;top:0;display:flex;flex-direction:column;gap:8px}
+.x3 canvas{width:100%;height:auto;border:1px solid var(--border);border-radius:8px;background:#0b0b0c;image-rendering:auto}
+.x3 .ctl{display:flex;flex-direction:column;gap:10px}
+.x3 .row>label{min-width:96px}
+.x3 .row input[type=number]{width:72px}
+.x3 .row input[type=range]{flex:1;accent-color:var(--accent)}
+.x3 .row output{width:52px;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.x3 .rlist{border:1px solid var(--border);border-radius:8px;max-height:210px;overflow:auto}
+.x3 .rlist label{display:grid;grid-template-columns:auto 1fr auto;gap:8px;padding:4px 8px;border-bottom:1px solid var(--grid);cursor:pointer;font-size:12px}
+.x3 .rlist label:hover{background:var(--wash)}
+.x3 .rlist .m{color:var(--muted);font-variant-numeric:tabular-nums}
+.x3 .warn{color:#eda100;font-size:12px}
+@media (max-width:860px){.x3{grid-template-columns:1fr}}
 #sidebtn{display:none}
 #nodata{padding:40px;text-align:center;color:var(--ink2)}
 @media (max-width:860px){
@@ -331,7 +347,7 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
     <div id="mapwrap">
       <div id="map"></div>
       <button class="float icon-btn" id="sidebtn">☰ Filters</button>
-      <div class="float" id="toolbar"><div class="seg" id="modeSeg2"><button data-v="routes">Routes</button><button data-v="heat">Heatmap</button><button data-v="both">Both</button></div></div>
+      <div class="float" id="toolbar"><div class="seg" id="modeSeg2"><button data-v="routes">Routes</button><button data-v="heat">Heatmap</button><button data-v="both">Both</button></div><button class="icon-btn" id="export3dBtn" title="Export what is on the map as a 3D-printable STL file">3D print…</button></div>
       <div class="float" id="mapopts"><label for="baseSel">Map</label>
         <select id="baseSel"><option value="auto">Auto</option><option value="dark">Dark</option><option value="light">Light</option><option value="streets">Streets</option><option value="sat">Satellite</option><option value="blankDark">Blank (dark)</option><option value="blankLight">Blank (light)</option></select></div>
       <div class="float" id="legend" hidden></div>
@@ -399,6 +415,40 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
         <p><b>Location history (.json)</b> is your Google Timeline export (the <code>location-history.json</code> you get from the Maps app on your phone). It captures where you were outside workouts: each trip becomes a route coloured by mode (walking, cycling, car, transit, flight), each place you stayed becomes a point, and sparse location traces are kept as thin lines. Trips are straight lines from start to end because the export doesn't store the road taken. Place visits are hidden by default; tick “Visit” under Activity, or set Heat counts to “Time spent”, to see where your hours go. Load it as its own source so it stays separate from your workouts.</p>
         <p>To compare two people or two periods, import each as its own named source, then use the Compare tab.</p>
       </details>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dlg3d">
+  <div class="dlg-body">
+    <div class="row"><h2 style="flex:1">3D print export</h2><button class="icon-btn" id="x3Close">Close</button></div>
+    <div class="hint">Builds a printable STL from the current map view and filters, in your browser. Pan and zoom the map to choose the area first; crop and leave out trails below.</div>
+    <div class="x3">
+      <div class="pv">
+        <canvas id="x3Canvas" width="320" height="320"></canvas>
+        <div class="hint" id="x3Info"></div>
+        <div class="warn" id="x3Warn"></div>
+        <div class="row"><button class="btn primary" id="x3Export">Download STL</button><span class="hint">Open in your slicer (Prusa, Bambu, Cura, Orca…)</span></div>
+      </div>
+      <div class="ctl">
+        <div class="row"><label>Style</label><div class="seg" id="x3Style"><button data-v="relief">Heat relief</button><button data-v="routes">Raised routes</button></div></div>
+        <div class="row"><label for="x3Size">Longest side</label><input type="range" id="x3Size" min="40" max="250" step="1"><output id="x3SizeO"></output></div>
+        <div class="row"><label for="x3Bed">Bed size (mm)</label><input type="number" id="x3Bed" min="60" max="1000" step="10"><span class="hint">max model size</span></div>
+        <div class="row"><label for="x3Base">Base thickness</label><input type="range" id="x3Base" min="1" max="10" step=".5"><output id="x3BaseO"></output></div>
+        <div class="row"><label for="x3H" id="x3HL">Max height</label><input type="range" id="x3H" min="1" max="60" step=".5"><output id="x3HO"></output></div>
+        <div class="row"><label for="x3W" id="x3WL">Ridge width</label><input type="range" id="x3W" min=".8" max="6" step=".1"><output id="x3WO"></output></div>
+        <div class="row" id="x3CountRow"><label for="x3Count">Height shows</label><select id="x3Count" style="flex:1"><option value="trips">Number of trips</option><option value="dist">Distance covered</option><option value="time">Time spent</option></select></div>
+        <div class="row" id="x3ScaleRow"><label for="x3Scale">Height scale</label><select id="x3Scale" style="flex:1"><option value="log">Logarithmic (every route visible)</option><option value="lin">Linear (dramatic peaks)</option></select></div>
+        <div class="row"><label for="x3Detail">Detail</label><select id="x3Detail" style="flex:1"><option value="0.7">Draft (0.7 mm cells, small file)</option><option value="0.5">Normal (0.5 mm)</option><option value="0.35">Fine (0.35 mm, large file)</option></select></div>
+        <div class="hint" style="margin-top:2px">Crop (trim the current view)</div>
+        <div class="row"><label for="x3L">Left</label><input type="range" id="x3L" min="0" max="45" step="1"><output id="x3LO"></output></div>
+        <div class="row"><label for="x3R">Right</label><input type="range" id="x3R" min="0" max="45" step="1"><output id="x3RO"></output></div>
+        <div class="row"><label for="x3T">Top</label><input type="range" id="x3T" min="0" max="45" step="1"><output id="x3TO"></output></div>
+        <div class="row"><label for="x3B">Bottom</label><input type="range" id="x3B" min="0" max="45" step="1"><output id="x3BO"></output></div>
+        <div class="hint" style="margin-top:2px">Leave out trails <span id="x3Count2"></span></div>
+        <div class="row"><input type="text" id="x3Search" placeholder="Filter list (type, date, km…)" style="flex:1"><button class="btn" id="x3All">All</button><button class="btn" id="x3None">None</button></div>
+        <div class="rlist" id="x3List"></div>
+      </div>
     </div>
   </div>
 </dialog>
@@ -1098,7 +1148,7 @@ function density(v,Pm,list,slot,o){
       if(mode==='dist')continue;
       const x=w.X[0]*v.S-v.ox,y=w.Y[0]*v.S-v.oy;
       if(x<lim0||x>=limX||y<lim0||y>=limY)continue;
-      const rc=Math.max(2,Math.round(Math.max(4,S.heatR*2)/g)),cx=Math.floor(x/g)+pad,cy=Math.floor(y/g)+pad;
+      const rc=Math.max(o.disc!==undefined?1:2,Math.round((o.disc!==undefined?o.disc:Math.max(4,S.heatR*2))/g)),cx=Math.floor(x/g)+pad,cy=Math.floor(y/g)+pad;
       let nc=0;for(let dy=-rc;dy<=rc;dy++)for(let dx=-rc;dx<=rc;dx++)if(dx*dx+dy*dy<=rc*rc)nc++;
       const per=mode==='time'?w.dur/nc:1;
       for(let dy=-rc;dy<=rc;dy++)for(let dx=-rc;dx<=rc;dx++)if(dx*dx+dy*dy<=rc*rc){const id=(cy+dy)*gw+cx+dx;if(id>=0&&id<N)A[id]+=per;}
@@ -1254,11 +1304,12 @@ function setSelected(w,silent,alts){
     ...(w.kcal?[['Active energy',nf0.format(w.kcal)+' kcal']]:[]),['Start',esc(areaName(w.cl))],['Source',w.src+(DS.length>1?' · '+esc(dsName(w.ds)):'')]];
   let html=`<button class="close" aria-label="Close">×</button><h3>${pretty(w.type)}</h3><div class="sub">${fmtDate(w)} · ${fmtTime(w)}</div><dl>${rows.map(([a,b])=>`<dt>${a}</dt><dd>${b}</dd>`).join('')}</dl>`;
   if(covered<70)html+=`<div class="hint">GPS covers only about ${Math.round(covered)}% of the recorded distance, so the drawn line is partial.</div>`;
-  html+=`<div class="row" style="margin-top:8px"><button class="btn" data-zoom>Zoom to route</button></div>`;
+  html+=`<div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap"><button class="btn" data-zoom>Zoom to route</button><button class="btn" data-x3>${X3.excl.has(w.id)?'Include in 3D print':'Leave out of 3D print'}</button></div>`;
   if(alts&&alts.length>1)html+=`<div class="also"><h4>${alts.length} routes here</h4>${alts.map(a=>`<button data-id="${a.id}"><span>${fmtDate(a)}</span><span>${pretty(a.type)} · ${fmtKm(a.km)} km</span></button>`).join('')}</div>`;
   card.innerHTML=html;card.hidden=false;
   card.querySelector('.close').onclick=()=>setSelected(null);
   card.querySelector('[data-zoom]').onclick=()=>fitWorkout(w);
+  card.querySelector('[data-x3]').onclick=e=>{if(X3.excl.has(w.id))X3.excl.delete(w.id);else X3.excl.add(w.id);e.target.textContent=X3.excl.has(w.id)?'Include in 3D print':'Leave out of 3D print';};
   card.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>setSelected(W[+b.dataset.id],false,alts));
   document.querySelectorAll('.wrow').forEach(r=>r.classList.toggle('sel',+r.dataset.id===w.id));
   if(!silent)redraw();
@@ -1618,6 +1669,159 @@ function renderDsList(){
 $('#dataBtn').onclick=()=>{renderDsList();setStatus('');setProg(null);dlg.showModal();};
 $('#dlgClose').onclick=()=>dlg.close();
 
+/* ======================= 3D print export (STL) ======================= */
+// Both styles are height fields built from the same density engine as the heatmap, then meshed into a watertight solid.
+const X3={style:'relief',size:store.get('x3size',200),bed:store.get('x3bed',250),base:3,detail:.5,count:'trips',scale:'log',
+  cfg:{relief:{h:15,w:1.8},routes:{h:2,w:1.6}},trim:[0,0,0,0],excl:new Set(),view:null,search:''};
+const dlg3=$('#dlg3d');
+function x3Rect(){
+  const [x0,y0,x1,y1]=X3.view,w=x1-x0,h=y1-y0,[l,r,t,b]=X3.trim.map(v=>v/100);
+  return [x0+w*l,y0+h*t,x1-w*r,y1-h*b];
+}
+const x3Pool=()=>INC.filter(w=>!(w.pas&&w.type!=='Visit'));       // location-history trip lines are straight hops, left out
+function x3Inside(rect,list){const [cx0,cy0,cx1,cy1]=rect;return list.filter(w=>!(w.bb[2]<cx0||w.bb[0]>cx1||w.bb[3]<cy0||w.bb[1]>cy1));}
+function x3Field(cellMm){
+  const rect=x3Rect(),[cx0,cy0,cx1,cy1]=rect,wW=cx1-cx0,hW=cy1-cy0;
+  const mm=X3.size/Math.max(wW,hW),modelW=wW*mm,modelH=hW*mm;
+  const nx=Math.max(8,Math.round(modelW/cellMm)+1),ny=Math.max(8,Math.round(modelH/cellMm)+1);
+  const cell=modelW/(nx-1),S_=(nx-1)/wW,cfg=X3.cfg[X3.style];
+  const sigmaMm=cfg.w/2.355,sigma=Math.max(.6,sigmaMm/cell),rad=Math.ceil(sigma*3),pad=rad+1,gw=nx+2*pad,gh=ny+2*pad;
+  const Pm={g:1,sigma,rad,pad,cw:nx,ch:ny,gw,gh,N:gw*gh},v={w:nx,h:ny,S:S_,ox:cx0*S_,oy:cy0*S_,zoom:0};
+  const list=x3Inside(rect,x3Pool()).filter(w=>!X3.excl.has(w.id));
+  const saved=viewBounds;viewBounds=rect;
+  const A=density(v,Pm,list,3,{mode:X3.count,trips:false,disc:Math.max(1.2,sigmaMm*1.4/cell)});
+  viewBounds=saved;
+  const z=new Float32Array(nx*ny);let mx=0,top=0;
+  for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){const a=A[(j+pad)*gw+i+pad];if(a>mx)mx=a;}
+  const ksig=sigma*2.5066;
+  for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){
+    const a=A[(j+pad)*gw+i+pad];let t=0;
+    if(mx>0){
+      if(X3.style==='relief'){const q=a/mx;t=X3.scale==='lin'?q:Math.max(0,(Math.log1p(q*1000)/6.9088-.04)/.96);}
+      else{const c=Math.min(1,a*ksig),u=Math.max(0,Math.min(1,(c-.3)/.35));t=u*u*(3-2*u);}   // smooth edge, one flat height
+    }
+    const h=X3.base+t*cfg.h;z[j*nx+i]=h;if(h>top)top=h;
+  }
+  return {nx,ny,z,modelW,modelH,cell,top,n:list.length,sigmaMm};
+}
+function x3STL(f){
+  const {nx,ny,z,modelW,modelH}=f,ex=modelW/(nx-1),ey=modelH/(ny-1);
+  const per=[];                                                 // perimeter, counter-clockwise seen from above
+  for(let i=0;i<nx-1;i++)per.push([i,ny-1]);
+  for(let j=ny-1;j>0;j--)per.push([nx-1,j]);
+  for(let i=nx-1;i>0;i--)per.push([i,0]);
+  for(let j=0;j<ny-1;j++)per.push([0,j]);
+  const T=2*(nx-1)*(ny-1)+2*per.length+per.length;
+  const buf=new ArrayBuffer(84+50*T),dv=new DataView(buf);dv.setUint32(80,T,true);
+  let off=84;
+  const tri=(a,b,c)=>{
+    const ux=b[0]-a[0],uy=b[1]-a[1],uz=b[2]-a[2],vx=c[0]-a[0],vy=c[1]-a[1],vz=c[2]-a[2];
+    let nx_=uy*vz-uz*vy,ny_=uz*vx-ux*vz,nz_=ux*vy-uy*vx;const l=Math.hypot(nx_,ny_,nz_)||1;
+    dv.setFloat32(off,nx_/l,true);dv.setFloat32(off+4,ny_/l,true);dv.setFloat32(off+8,nz_/l,true);
+    let o=off+12;for(const p of [a,b,c]){dv.setFloat32(o,p[0],true);dv.setFloat32(o+4,p[1],true);dv.setFloat32(o+8,p[2],true);o+=12;}
+    dv.setUint16(off+48,0,true);off+=50;
+  };
+  const P=(i,j,h)=>[i*ex,(ny-1-j)*ey,h];
+  for(let j=0;j<ny-1;j++)for(let i=0;i<nx-1;i++){
+    const nw=P(i,j,z[j*nx+i]),ne=P(i+1,j,z[j*nx+i+1]),se=P(i+1,j+1,z[(j+1)*nx+i+1]),sw=P(i,j+1,z[(j+1)*nx+i]);
+    tri(sw,se,ne);tri(sw,ne,nw);
+  }
+  const c0=[modelW/2,modelH/2,0];
+  for(let k=0;k<per.length;k++){
+    const [ai,aj]=per[k],[bi,bj]=per[(k+1)%per.length];
+    const at=P(ai,aj,z[aj*nx+ai]),bt=P(bi,bj,z[bj*nx+bi]),ab=[at[0],at[1],0],bb=[bt[0],bt[1],0];
+    tri(ab,bb,bt);tri(ab,bt,at);                                // outer wall
+    tri(c0,bb,ab);                                              // underside, fanned so every edge is shared
+  }
+  return buf;
+}
+function x3Summary(f,cell){
+  const tris=2*(f.nx-1)*(f.ny-1)+3*(2*(f.nx-1)+2*(f.ny-1));
+  return {tris,mb:(84+50*tris)/1e6};
+}
+let x3Timer=0;
+function x3Refresh(now){ clearTimeout(x3Timer); x3Timer=setTimeout(x3Preview,now?0:120); }
+function x3Preview(){
+  if(!dlg3.open)return;
+  const f=x3Field(Math.max(X3.detail,Math.max(X3.size/300,.4)));
+  const cv=$('#x3Canvas'),ctx=cv.getContext('2d');cv.width=f.nx;cv.height=f.ny;
+  const img=ctx.createImageData(f.nx,f.ny),d=img.data,{nx,ny,z}=f,hh=Math.max(1e-6,f.top-X3.base);
+  const k=2.2/Math.max(.5,X3.cfg[X3.style].h);
+  for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){
+    const h=z[j*nx+i],hl=z[j*nx+Math.max(0,i-1)],hr=z[j*nx+Math.min(nx-1,i+1)],hu=z[Math.max(0,j-1)*nx+i],hd=z[Math.min(ny-1,j+1)*nx+i];
+    const sh=Math.max(0,Math.min(1.6,1+((hl-hr)+(hu-hd))*k*.5)),e=Math.max(0,Math.min(1,(h-X3.base)/hh)),o=(j*nx+i)*4;
+    // slate plate -> amber ridges, lit from the upper left
+    const r=(30+e*225)*(.55+sh*.45),g=(34+e*150)*(.55+sh*.45),b=(46+e*30)*(.55+sh*.45);
+    d[o]=Math.min(255,r);d[o+1]=Math.min(255,g);d[o+2]=Math.min(255,b);d[o+3]=255;
+  }
+  ctx.putImageData(img,0,0);
+  const fin=x3Field(X3.detail),sm=x3Summary(fin);
+  const fits=Math.max(fin.modelW,fin.modelH)<=X3.bed+1e-6;
+  $('#x3Info').textContent=`${fin.modelW.toFixed(0)} × ${fin.modelH.toFixed(0)} mm, ${fin.top.toFixed(1)} mm tall · ${fin.n} routes · ${nf0.format(sm.tris)} triangles, ${sm.mb.toFixed(1)} MB`;
+  const warns=[];
+  if(!fits)warns.push(`Larger than your ${X3.bed} mm bed.`);
+  if(X3.cfg[X3.style].w<1.0)warns.push('Ridges narrower than 1 mm may not print cleanly with a 0.4 mm nozzle.');
+  if(!fin.n)warns.push('No routes in this area: check the crop and filters.');
+  $('#x3Warn').textContent=warns.join(' ');
+  $('#x3Count2').textContent=`(${x3Inside(x3Rect(),x3Pool()).filter(w=>!X3.excl.has(w.id)).length} included)`;
+}
+function x3Sync(){
+  const cfg=X3.cfg[X3.style],rel=X3.style==='relief';
+  $$('#x3Style button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===X3.style));
+  $('#x3Size').max=X3.bed;X3.size=Math.min(X3.size,X3.bed);
+  const set=(id,v,fmt)=>{$('#'+id).value=v;$('#'+id+'O').textContent=fmt(v);};
+  set('x3Size',X3.size,v=>v+' mm');set('x3Base',X3.base,v=>v+' mm');
+  $('#x3HL').textContent=rel?'Max height':'Route height';$('#x3WL').textContent=rel?'Ridge width':'Line width';
+  $('#x3H').min=rel?1:.6;$('#x3H').max=rel?60:10;set('x3H',cfg.h,v=>v+' mm');set('x3W',cfg.w,v=>v+' mm');
+  $('#x3Bed').value=X3.bed;$('#x3Count').value=X3.count;$('#x3Scale').value=X3.scale;$('#x3Detail').value=String(X3.detail);
+  ['L','R','T','B'].forEach((k,i)=>set('x3'+k,X3.trim[i],v=>v+'%'));
+  $('#x3CountRow').style.display=rel?'':'none';$('#x3ScaleRow').style.display=rel?'':'none';
+}
+function x3RenderList(){
+  const host=$('#x3List'),q=X3.search.trim().toLowerCase();
+  const rows=x3Inside(x3Rect(),x3Pool()).filter(w=>w.type!=='Visit').sort((a,b)=>b.start.localeCompare(a.start));
+  const m=rows.filter(w=>!q||`${w.type} ${w.day} ${fmtKm(w.km)} km ${areaName(w.cl)}`.toLowerCase().includes(q));
+  host.innerHTML='';
+  const frag=document.createDocumentFragment();
+  for(const w of m.slice(0,200)){
+    const l=el('label');const cb=el('input',{type:'checkbox'});cb.checked=!X3.excl.has(w.id);
+    cb.onchange=()=>{cb.checked?X3.excl.delete(w.id):X3.excl.add(w.id);x3Refresh();};
+    l.append(cb,el('span',{text:`${w.day} · ${pretty(w.type)}`}),el('span',{class:'m',text:`${fmtKm(w.km)} km`}));
+    frag.append(l);
+  }
+  host.append(frag);
+  if(m.length>200)host.append(el('div',{class:'hint',style:'padding:6px 8px',text:`Showing 200 of ${m.length}; use the filter to narrow the list.`}));
+  if(!m.length)host.append(el('div',{class:'hint',style:'padding:6px 8px',text:'No routes in this area.'}));
+}
+function open3D(){
+  if(!INC.length){alert('There is nothing on the map to export. Load data or relax the filters first.');return;}
+  X3.view=viewBounds.slice();X3.trim=[0,0,0,0];X3.search='';$('#x3Search').value='';
+  x3Sync();x3RenderList();dlg3.showModal();x3Refresh(true);
+}
+function bind3D(){
+  $('#export3dBtn').onclick=open3D;$('#x3Close').onclick=()=>dlg3.close();
+  $$('#x3Style button').forEach(b=>b.onclick=()=>{X3.style=b.dataset.v;x3Sync();x3Refresh(true);});
+  const num=(id,fn,after)=>$('#'+id).addEventListener('input',e=>{fn(+e.target.value);x3Sync();after&&after();x3Refresh();});
+  num('x3Size',v=>{X3.size=v;store.set('x3size',v);});
+  num('x3Base',v=>X3.base=v);
+  num('x3H',v=>X3.cfg[X3.style].h=v);
+  num('x3W',v=>X3.cfg[X3.style].w=v);
+  ['L','R','T','B'].forEach((k,i)=>num('x3'+k,v=>{X3.trim[i]=v;if(X3.trim[i]+X3.trim[i^1]>90)X3.trim[i]=90-X3.trim[i^1];},x3RenderList));
+  $('#x3Bed').addEventListener('change',e=>{X3.bed=Math.max(60,+e.target.value||250);store.set('x3bed',X3.bed);x3Sync();x3Refresh(true);});
+  $('#x3Count').onchange=e=>{X3.count=e.target.value;x3Refresh(true);};
+  $('#x3Scale').onchange=e=>{X3.scale=e.target.value;x3Refresh(true);};
+  $('#x3Detail').onchange=e=>{X3.detail=+e.target.value;x3Refresh(true);};
+  $('#x3Search').addEventListener('input',e=>{X3.search=e.target.value;x3RenderList();});
+  $('#x3All').onclick=()=>{for(const w of x3Inside(x3Rect(),x3Pool()))X3.excl.delete(w.id);x3RenderList();x3Refresh(true);};
+  $('#x3None').onclick=()=>{for(const w of x3Inside(x3Rect(),x3Pool()))X3.excl.add(w.id);x3RenderList();x3Refresh(true);};
+  $('#x3Export').onclick=()=>{
+    const f=x3Field(X3.detail);
+    if(!f.n){$('#x3Warn').textContent='No routes in this area: nothing to export.';return;}
+    const blob=new Blob([x3STL(f)],{type:'model/stl'}),a=el('a',{href:URL.createObjectURL(blob),download:`workout-atlas-${X3.style==='relief'?'relief':'routes'}-${Math.round(Math.max(f.modelW,f.modelH))}mm.stl`});
+    document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  };
+}
+
 /* ======================= wiring ======================= */
 function bindRange(id,key,fmt,after){
   const i=$('#'+id),o=$('#'+id+'o');i.value=S[key];o.textContent=fmt(S[key]);
@@ -1713,6 +1917,7 @@ async function boot(){
   $('#cmpSep').onchange=e=>{CMP.sep=e.target.checked;store.set('cmpSep',CMP.sep);filterVersion++;redraw();};
   $('#cmpSwap').onclick=()=>{const t=CMP.A;CMP.A=CMP.B;CMP.B=t;buildCompareUI();scheduleUpdate();};
   $('#sidebtn').onclick=()=>document.body.classList.toggle('side-open');
+  bind3D();
   document.addEventListener('keydown',e=>{if(e.key==='Escape')setSelected(null);});
   let moveTimer=0;
   map.on('move zoom resize',redraw);
@@ -1725,7 +1930,7 @@ async function boot(){
   renderDsList();
   if(!DS.length)dlg.showModal();
 }
-window.WorkoutAtlas={map,draw,F,S,CMP,P,DS,importZip,importFiles,importGoogleTimeline,addDataset,rebuildAll,get W(){return W;}};
+window.WorkoutAtlas={map,draw,F,S,CMP,P,DS,X3,x3Field,x3STL,open3D,importZip,importFiles,importGoogleTimeline,addDataset,rebuildAll,get W(){return W;}};
 window.addEventListener('resize',()=>{map.invalidateSize();});
 boot();
 })();
