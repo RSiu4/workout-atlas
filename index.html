@@ -269,6 +269,8 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
           <div class="row"><label for="heatR">Thickness</label><input type="range" id="heatR" min="1" max="40" step="1" value="3"><output id="heatRo"></output></div>
           <div class="row"><label for="heatI">Intensity</label><input type="range" id="heatI" min="0.3" max="4" step="0.1" value="1"><output id="heatIo"></output></div>
           <div class="row"><label for="heatA">Opacity</label><input type="range" id="heatA" min="0.2" max="1" step="0.05" value="0.9"><output id="heatAo"></output></div>
+          <div class="row"><label for="heatGlow" title="A soft halo around busy routes, like Strava's heatmap">Glow</label><input type="range" id="heatGlow" min="0" max="1" step="0.05" value="0.35"><output id="heatGlowo"></output></div>
+          <div class="row"><button class="btn" id="stravaLook" title="Heat-only layers, Strava Hot palette, glow, near-black map without labels">Apply Strava look</button></div>
         </div>
       </details>
 
@@ -349,7 +351,7 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
       <button class="float icon-btn" id="sidebtn">☰ Filters</button>
       <div class="float" id="toolbar"><div class="seg" id="modeSeg2"><button data-v="routes">Routes</button><button data-v="heat">Heatmap</button><button data-v="both">Both</button></div><button class="icon-btn" id="export3dBtn" title="Export what is on the map as a 3D-printable STL file">3D print…</button></div>
       <div class="float" id="mapopts"><label for="baseSel">Map</label>
-        <select id="baseSel"><option value="auto">Auto</option><option value="dark">Dark</option><option value="light">Light</option><option value="streets">Streets</option><option value="sat">Satellite</option><option value="blankDark">Blank (dark)</option><option value="blankLight">Blank (light)</option></select></div>
+        <select id="baseSel"><option value="auto">Auto</option><option value="dark">Dark</option><option value="light">Light</option><option value="streets">Streets</option><option value="strava">Strava dark</option><option value="sat">Satellite</option><option value="blankDark">Blank (dark)</option><option value="blankLight">Blank (light)</option></select></div>
       <div class="float" id="legend" hidden></div>
       <div class="float" id="card" hidden></div>
       <div id="tip" hidden></div>
@@ -770,7 +772,7 @@ const PAL={
  ice:[[0,[60,90,210]],[.5,[40,170,230]],[1,[240,252,255]]],
  viridis:[[0,[90,40,140]],[.25,[59,82,139]],[.5,[33,145,140]],[.75,[94,201,98]],[1,[253,231,37]]],
  // approximations of the colour options in Strava's heatmap (hot, blue, purple, gray, blue-red); low end kept bright enough to read on a dark map
- stravaHot:[[0,[160,20,10]],[.3,[225,65,10]],[.6,[255,145,0]],[.85,[255,225,70]],[1,[255,255,255]]],
+ stravaHot:[[0,[88,12,38]],[.22,[150,24,24]],[.48,[225,70,8]],[.72,[255,150,10]],[.9,[255,222,85]],[1,[255,252,235]]],
  stravaBlue:[[0,[25,60,180]],[.4,[45,125,255]],[.75,[120,205,255]],[1,[255,255,255]]],
  stravaPurple:[[0,[85,20,150]],[.4,[160,50,210]],[.75,[225,130,255]],[1,[255,255,255]]],
  stravaGray:[[0,[95,95,95]],[.5,[175,175,175]],[1,[255,255,255]]],
@@ -784,7 +786,7 @@ const F={from:'',to:'',type:new Set(),area:new Set(),wd:new Set([0,1,2,3,4,5,6])
 const CMP={count:store.get('cmpCount','trips'),on:false,A:{ds:'all',from:'',to:''},B:{ds:'all',from:'',to:''},heat:store.get('cmpHeat','overlay'),sep:store.get('cmpSep',true)};
 if(store.get('heatVer',0)<2){store.set('heatR',3);store.set('heatI',1);store.set('heatVer',2);}
 const S={lblPlaces:store.get('lblPlaces',true),lblMap:store.get('lblMap',true),mode:store.get('mode','both'),colorBy:store.get('colorBy','type'),lineW:store.get('lineW',2),lineA:store.get('lineA',.65),
-  heatR:store.get('heatR',3),heatI:store.get('heatI',1),heatA:store.get('heatA',.9),
+  heatR:store.get('heatR',3),heatI:store.get('heatI',1),heatA:store.get('heatA',.9),heatGlow:store.get('heatGlow',.35),
   base:store.get('base','auto'),theme:store.get('theme',matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'),
   sort:'date',tlMetric:'km',tlAxis:'time',sel:null,hover:null,listLimit:150,autoFit:false};
 const P={active:false,playing:false,cur:0,start:0,end:0,speed:91,win:'acc',count:0};
@@ -968,6 +970,7 @@ const BASES={
   dark:{url:ESRI+'Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',labels:ESRI+'Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',attr:'Tiles © Esri — Esri, HERE, Garmin, OpenStreetMap contributors',dark:true,nz:16},
   light:{url:ESRI+'Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',labels:ESRI+'Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',attr:'Tiles © Esri — Esri, HERE, Garmin, OpenStreetMap contributors',dark:false,nz:16},
   streets:{url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',attr:'© OpenStreetMap contributors',dark:false,nz:19},
+  strava:{url:ESRI+'Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',attr:'Tiles © Esri — Esri, HERE, Garmin, OpenStreetMap contributors',dark:true,nz:16,filter:'brightness(.5) contrast(1.15)'},
   sat:{url:ESRI+'World_Imagery/MapServer/tile/{z}/{y}/{x}',attr:'Imagery © Esri, Maxar, Earthstar Geographics',dark:true,nz:19},
   blankDark:{blank:true,bg:'#0b0b0c',dark:true},
   blankLight:{blank:true,bg:'#f6f5f1',dark:false}};
@@ -981,6 +984,7 @@ function setBase(){
   else{
     cont.style.background='';
     baseLayer=L.tileLayer(b.url,{attribution:b.attr,maxZoom:19,maxNativeZoom:b.nz}).addTo(map);
+    baseLayer.getContainer().style.filter=b.filter||'';
   }
   applyMapLabels();
   paintColors();redraw();renderLegend();
@@ -1202,7 +1206,26 @@ function density(v,Pm,list,slot,o){
   for(let y=0;y<gh;y++){const row=y*gw;for(let x=0;x<gw;x++){const val=A[row+x];if(val===0)continue;const x0=Math.max(0,x-rad),x1=Math.min(gw-1,x+rad);for(let xx=x0;xx<=x1;xx++)B[row+xx]+=val*k[xx-x+rad];}}
   A.fill(0);
   for(let y=0;y<gh;y++){const row=y*gw;for(let x=0;x<gw;x++){const val=B[row+x];if(val<1e-6)continue;const y0=Math.max(0,y-rad),y1=Math.min(gh-1,y+rad);for(let yy=y0;yy<=y1;yy++)A[yy*gw+x]+=val*k[yy-y+rad];}}
+  if(o.glow>0)addGlow(A,gw,gh,sigma,o.glow);
   return A;
+}
+function addGlow(A,gw,gh,sigma,amount){
+  const f=4,cw=Math.ceil(gw/f),ch=Math.ceil(gh/f),C=new Float32Array(cw*ch),D=new Float32Array(cw*ch);
+  for(let y=0;y<gh;y++){const row=y*gw,cr=((y/f)|0)*cw;for(let x=0;x<gw;x++){const v=A[row+x];if(v)C[cr+((x/f)|0)]+=v/(f*f);}}
+  const se=Math.max(.8,sigma*3/f),rad=Math.ceil(se*3),k=new Float32Array(2*rad+1);let ks=0;
+  for(let i=-rad;i<=rad;i++){k[i+rad]=Math.exp(-i*i/(2*se*se));ks+=k[i+rad];}for(let i=0;i<k.length;i++)k[i]/=ks;
+  for(let y=0;y<ch;y++){const row=y*cw;for(let x=0;x<cw;x++){const v=C[row+x];if(!v)continue;const a=Math.max(0,x-rad),b=Math.min(cw-1,x+rad);for(let xx=a;xx<=b;xx++)D[row+xx]+=v*k[xx-x+rad];}}
+  C.fill(0);
+  for(let y=0;y<ch;y++){const row=y*cw;for(let x=0;x<cw;x++){const v=D[row+x];if(!v)continue;const a=Math.max(0,y-rad),b=Math.min(ch-1,y+rad);for(let yy=a;yy<=b;yy++)C[yy*cw+x]+=v*k[yy-y+rad];}}
+  const g=amount*1.4;
+  for(let y=0;y<gh;y++){
+    const fy=Math.max(0,Math.min(ch-1,y/f-.5)),y0=Math.floor(fy),y1=Math.min(ch-1,y0+1),ty=fy-y0,row=y*gw;
+    for(let x=0;x<gw;x++){
+      const fx=Math.max(0,Math.min(cw-1,x/f-.5)),x0=Math.floor(fx),x1=Math.min(cw-1,x0+1),tx=fx-x0;
+      const v=(C[y0*cw+x0]*(1-tx)+C[y0*cw+x1]*tx)*(1-ty)+(C[y1*cw+x0]*(1-tx)+C[y1*cw+x1]*tx)*ty;
+      if(v>1e-7)A[row+x]+=g*v;
+    }
+  }
 }
 function refOf(A,N){ // the hottest cell sets the top of a logarithmic scale, so single trips stay visible next to busy corridors
   let mx=0;for(let i=0;i<N;i++)if(A[i]>mx)mx=A[i];
@@ -1226,10 +1249,10 @@ function drawHeatLayers(v,ls){
   const Pm=heatParams(v),{pad,cw,ch,gw,N}=Pm;
   for(const L of ls){
     if(!L.cfg.heat||!L.list.length)continue;
-    const o={mode:L.cfg.count,trips:!!L.cfg.trips};
+    const o={mode:L.cfg.count,trips:!!L.cfg.trips,glow:S.heatGlow};
     let ref;
     if(P.active){
-      const key=[v.w,v.h,v.zoom.toFixed(3),Math.round(v.ox),Math.round(v.oy),S.heatR,o.mode,o.trips,filterVersion].join('|'),lk=heatLock[L.key];
+      const key=[v.w,v.h,v.zoom.toFixed(3),Math.round(v.ox),Math.round(v.oy),S.heatR,o.mode,o.trips,o.glow,filterVersion].join('|'),lk=heatLock[L.key];
       if(!lk||lk.key!==key)heatLock[L.key]={key,ref:refOf(density(v,Pm,L.all,1,o),N)};
       ref=heatLock[L.key].ref;
     }
@@ -2046,8 +2069,17 @@ const HAS_STORE=!!window.indexedDB;
 async function boot(){
   applyTheme();
   bindRange('lineW','lineW',v=>v);bindRange('lineA','lineA',v=>v);
-  bindRange('heatR','heatR',v=>v);bindRange('heatI','heatI',v=>v);bindRange('heatA','heatA',v=>v);
+  bindRange('heatR','heatR',v=>v);bindRange('heatI','heatI',v=>v);bindRange('heatA','heatA',v=>v);bindRange('heatGlow','heatGlow',v=>v,()=>{filterVersion++;});
   bindSelect('colorBy','colorBy',()=>{paintColors();renderLegend();});
+  $('#stravaLook').onclick=()=>{
+    S.base='strava';store.set('base','strava');$('#baseSel').value='strava';
+    S.heatR=3;S.heatI=2.2;S.heatA=1;S.heatGlow=.7;S.lblMap=false;S.lblPlaces=false;
+    for(const k of ['heatR','heatI','heatA','heatGlow','lblMap','lblPlaces'])store.set(k,S[k]);
+    for(const [id,k] of [['heatR','heatR'],['heatI','heatI'],['heatA','heatA'],['heatGlow','heatGlow']]){$('#'+id).value=S[k];$('#'+id+'o').textContent=S[k];}
+    $('#lblMap').checked=false;$('#lblPlaces').checked=false;
+    for(const d of DS){if(!d.on)continue;const c=layerCfg(d);c.heat=true;c.routes=false;c.pal='stravaHot';c.count=dsPassive(d)?'time':'trips';saveLayer(d);}
+    buildLayerList();syncModeSeg();setBase();filterVersion++;renderLegend();redraw();
+  };
   $('#lblPlaces').checked=S.lblPlaces;$('#lblPlaces').onchange=e=>{S.lblPlaces=e.target.checked;store.set('lblPlaces',S.lblPlaces);redraw();};
   $('#lblMap').checked=S.lblMap;$('#lblMap').onchange=e=>{S.lblMap=e.target.checked;store.set('lblMap',S.lblMap);applyMapLabels();};
   $('#cmpCount').value=CMP.count;$('#cmpCount').onchange=e=>{CMP.count=e.target.value;store.set('cmpCount',CMP.count);filterVersion++;redraw();};
