@@ -768,7 +768,13 @@ const PAL={
  fire:[[0,[125,30,150]],[.3,[200,40,110]],[.55,[240,90,40]],[.8,[255,190,50]],[1,[255,250,210]]],
  classic:[[0,[30,60,255]],[.25,[0,200,255]],[.5,[60,230,90]],[.75,[255,230,40]],[1,[255,40,30]]],
  ice:[[0,[60,90,210]],[.5,[40,170,230]],[1,[240,252,255]]],
- viridis:[[0,[90,40,140]],[.25,[59,82,139]],[.5,[33,145,140]],[.75,[94,201,98]],[1,[253,231,37]]]};
+ viridis:[[0,[90,40,140]],[.25,[59,82,139]],[.5,[33,145,140]],[.75,[94,201,98]],[1,[253,231,37]]],
+ // approximations of the colour options in Strava's heatmap (hot, blue, purple, gray, blue-red); low end kept bright enough to read on a dark map
+ stravaHot:[[0,[160,20,10]],[.3,[225,65,10]],[.6,[255,145,0]],[.85,[255,225,70]],[1,[255,255,255]]],
+ stravaBlue:[[0,[25,60,180]],[.4,[45,125,255]],[.75,[120,205,255]],[1,[255,255,255]]],
+ stravaPurple:[[0,[85,20,150]],[.4,[160,50,210]],[.75,[225,130,255]],[1,[255,255,255]]],
+ stravaGray:[[0,[95,95,95]],[.5,[175,175,175]],[1,[255,255,255]]],
+ stravaBluered:[[0,[35,70,235]],[.35,[115,60,225]],[.7,[225,40,110]],[1,[255,70,25]]]};
 const LUT={};for(const k in PAL){const a=new Uint8ClampedArray(256*3);for(let i=0;i<256;i++){const c=ramp(PAL[k],i/255);a[3*i]=c[0];a[3*i+1]=c[1];a[3*i+2]=c[2];}LUT[k]=a;}
 const rgbCss=(k,t)=>{const i=clamp(Math.round(t*255),0,255),l=LUT[k];return `rgb(${l[3*i]},${l[3*i+1]},${l[3*i+2]})`;};
 
@@ -1987,7 +1993,7 @@ function syncModeSeg(){
   }
   $$('#modeSeg button,#modeSeg2 button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===cur));
 }
-const PAL_NAMES={fire:'Fire',classic:'Blue → red',ice:'Ice',viridis:'Viridis'};
+const PAL_NAMES={fire:'Fire',classic:'Blue → red',ice:'Ice',viridis:'Viridis',stravaHot:'Strava · Hot',stravaBlue:'Strava · Blue',stravaPurple:'Strava · Purple',stravaGray:'Strava · Gray',stravaBluered:'Strava · Blue-red'};
 function buildLayerList(){
   const host=$('#layerList');host.innerHTML='';
   for(const d of DS.filter(x=>x.on)){

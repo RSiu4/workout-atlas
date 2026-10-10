@@ -8,7 +8,7 @@ parsed in your browser; nothing is uploaded.
 
 <sub>Screenshots use **synthetic demo data**: two made-up people whose trips are routed along real Vienna streets (street data © OpenStreetMap contributors, base map © Esri), not anyone's real routes. Regenerate with `python tools/make_demo.py`.</sub>
 
-- **Routes and heatmaps**, with per-source layers (each data source has its own style, palette and counting method, drawn on top of each other)
+- **Routes and heatmaps**, with per-source layers (each data source has its own style, palette and counting method, drawn on top of each other). Palettes include Strava-style Hot, Blue, Purple, Gray and Blue-red
 - **Filters**: date (or brush the monthly chart), activity, place, time of day / week / month, distance, duration, speed, climb
 - **Play**: animate routes building up over time
 - **Compare**: two people or two time periods, overlay or difference heatmap, stats table
