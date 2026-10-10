@@ -39,6 +39,7 @@ Click **3D print…** on the map toolbar. The export uses the current map view a
 - **Raised routes**: every route is a raised line of fixed width on a flat plaque.
 - **Size**: set the longest side up to your bed size (default 250 mm); crop the view with the four trim sliders.
 - **Leave out trails**: untick routes in the list, or use **Leave out of 3D print** on a selected route.
+- **Map base** (optional): streets as fine raised lines, water recessed, buildings as an extra. Click **Load map data** to fetch OpenStreetMap data for the visible area from the public Overpass API (only the map area is sent, not your routes; the view must be under 16 km across).
 - **Detail**: 0.7 / 0.5 / 0.35 mm cells (about 150k to 600k triangles for a 200 mm model).
 
 The file is a watertight STL (flat base, solid walls). Keep ridges at least 1 mm wide for a 0.4 mm nozzle. Everything is generated in your browser.
