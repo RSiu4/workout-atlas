@@ -14,6 +14,7 @@ parsed in your browser; nothing is uploaded.
 - **Compare**: two people or two time periods, overlay or difference heatmap, stats table
 - **Blank map** option, and switchable place labels
 - **3D print export** (STL): your heatmap as a printable relief, or routes as raised lines on a plaque, with size, crop and per-trail exclusion
+- **Google Drive folder**: connect read-only to a Drive folder (for example a weekly upload) and sync from it
 - **Load your own data** in the page: Apple Health `export.zip`, a folder of `.gpx` / `.tcx` files (Garmin Connect, Strava and others), or a Google Timeline `location-history.json`
 
 ### Compare two people or two periods
@@ -30,6 +31,18 @@ and for the zip reader (fflate) the first time you open a `.zip`.
 
 Because it is one static file, it also works on GitHub Pages or any static host: the host only serves
 the page, your files are read locally in your browser.
+
+## Google Drive
+
+**Data… → Google Drive** lets you pick a Drive folder and import from it, for example when an app uploads your
+Apple Health export every week. It downloads the newest `.zip` and `.json` and all `.gpx` / `.tcx` files
+(including sub-folders) straight from Google to your browser, read-only, and replaces the previous import from
+that folder so repeated syncs don't pile up duplicates.
+
+It needs a free OAuth Client ID from your own Google Cloud project (the page lists the steps under *One-time setup*),
+and it must be opened from an `https://` address or `http://localhost`: Google sign-in does not work from a page
+opened as a local file. Your Client ID is stored only in your browser. For a personal copy on GitHub Pages, add that
+page's address as an authorised JavaScript origin.
 
 ## 3D printing
 

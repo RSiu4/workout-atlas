@@ -223,6 +223,18 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
 .x3 .rlist .m{color:var(--muted);font-variant-numeric:tabular-nums}
 .x3 .warn{color:#eda100;font-size:12px}
 @media (max-width:860px){.x3{grid-template-columns:1fr}}
+/* Google Drive */
+.gd{display:flex;flex-direction:column;gap:10px;padding:8px 0 4px}
+.gd .row>input[type=text]{flex:1}
+.gdlist{border:1px solid var(--border);border-radius:8px;max-height:230px;overflow:auto}
+.gdlist button,.gdlist label{display:grid;grid-template-columns:auto 1fr auto;gap:8px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--grid);background:none;padding:6px 10px;cursor:pointer;font-size:12.5px;align-items:center}
+.gdlist button:hover,.gdlist label:hover{background:var(--wash)}
+.gdlist .m{color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px}
+.gdlist .tag{color:var(--accent);font-size:11px}
+.crumb{display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:12.5px}
+.crumb button{border:0;background:none;color:var(--accent);padding:0 2px}
+.gd ol{margin:4px 0 0 18px;padding:0;color:var(--ink2);font-size:12.5px}
+.gd ol li{margin:3px 0}
 #sidebtn{display:none}
 #nodata{padding:40px;text-align:center;color:var(--ink2)}
 @media (max-width:860px){
@@ -409,6 +421,41 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
       <h3>Loaded sources</h3>
       <div id="dsList"></div>
     </div>
+
+    <details id="gdSec" class="gdsec">
+      <summary style="padding:8px 0">Google Drive: use a folder (for example a weekly upload)</summary>
+      <div class="gd">
+        <div class="hint">Connects read-only to your Drive and downloads files straight into this page; nothing goes through any other server. Pick a folder with your Apple Health export, GPX / TCX files or location history, then sync whenever new files arrive.</div>
+        <div class="row"><label for="gdClient" style="min-width:0">Client ID</label><input type="text" id="gdClient" placeholder="123456789-abc….apps.googleusercontent.com" autocomplete="off" spellcheck="false"></div>
+        <div class="row" style="flex-wrap:wrap">
+          <button class="btn primary" id="gdConnect">Connect Google Drive</button>
+          <button class="btn" id="gdPick" hidden>Choose folder…</button>
+          <button class="btn" id="gdSync" hidden>Sync from folder</button>
+        </div>
+        <div class="status" id="gdStat"></div>
+        <div id="gdBrowser" hidden>
+          <div class="crumb" id="gdCrumb"></div>
+          <div class="gdlist" id="gdFolders"></div>
+          <div class="row" style="margin-top:8px"><button class="btn primary" id="gdUse">Use this folder</button><button class="btn" id="gdCancel">Cancel</button></div>
+        </div>
+        <div id="gdPlan" hidden>
+          <div class="hint" id="gdPlanHead"></div>
+          <div class="gdlist" id="gdFiles"></div>
+          <label class="check" style="margin-top:8px"><input type="checkbox" id="gdReplace" checked> Replace the previous import from this folder (best for repeated syncs)</label>
+          <div class="row" style="margin-top:8px"><button class="btn primary" id="gdImport">Import selected</button><button class="btn" id="gdPlanClose">Close</button></div>
+        </div>
+        <details>
+          <summary style="padding:4px 0;font-size:12.5px">One-time setup (about 5 minutes)</summary>
+          <ol>
+            <li>In <b>console.cloud.google.com</b> create a project, then <b>APIs &amp; Services → Library</b> and enable <b>Google Drive API</b>.</li>
+            <li><b>OAuth consent screen</b>: choose External, fill the app name and your email, and add your own Google account under <b>Test users</b>.</li>
+            <li><b>Credentials → Create credentials → OAuth client ID → Web application</b>. Under <b>Authorised JavaScript origins</b> add the address you open this page from (for example <code>https://rsiu4.github.io</code> or <code>http://localhost:8791</code>), then paste the Client ID above.</li>
+            <li>Click <b>Connect</b>. Google shows an “unverified app” warning because it is your own test project; that is expected. Only the read-only Drive scope is requested.</li>
+          </ol>
+          <div class="hint" style="margin-top:6px">Sign-in cannot work from a page opened as a local file; it needs an <code>https://</code> address or <code>http://localhost</code>.</div>
+        </details>
+      </div>
+    </details>
 
     <div class="faq">
       <details><summary>Which should I use: the .zip or a folder of GPX / TCX files?</summary>
@@ -1684,22 +1731,23 @@ const dlg=$('#dataDlg');
 function setStatus(msg,err){const s=$('#status');s.textContent=msg||'';s.classList.toggle('err',!!err);}
 function setProg(f){const p=$('#prog');p.style.display=f===null?'none':'block';if(f!==null)p.firstElementChild.style.width=Math.round(f*100)+'%';}
 let importing=false;
-async function runImport(label,work){
-  if(importing)return;importing=true;
-  const name=$('#dsName').value.trim()||label;
+async function runImport(label,work,opts={}){
+  if(importing)return false;importing=true;let ok=false;
+  const name=opts.name||$('#dsName').value.trim()||label;
   setStatus('Starting…');setProg(0);importNote='';
   const t0=performance.now();
   try{
     const records=await work((f,msg)=>{setProg(f);setStatus(msg);});
     if(!records.length)throw new Error('No usable routes were found in that selection.');
+    if(opts.replace){const old=DS.find(x=>x.name===name&&x.id!=='embedded');if(old){DS.splice(DS.indexOf(old),1);await idb.del(old.id);}}
     const d={id:'u'+Date.now().toString(36)+(nextDs++),name,records,persist:$('#dsKeep').checked};
     addDataset(d);
     let saved=false;if(d.persist)saved=await idb.put({id:d.id,name:d.name,records:d.records,saved:Date.now()});
     setProg(1);setStatus(`Added “${name}”: ${nf0.format(records.length)} items in ${((performance.now()-t0)/1000).toFixed(1)}s.${d.persist?(saved?' Saved in this browser.':' (Could not save in this browser; it will be gone when you close the tab.)'):''}${importNote?' '+importNote:''}`);
     $('#dsName').value='';
-    rebuildAll(true);renderDsList();
+    rebuildAll(true);renderDsList();ok=true;
   }catch(e){console.error(e);setStatus(e.message||String(e),true);setProg(null);}
-  importing=false;
+  importing=false;return ok;
 }
 const baseName=n=>n.replace(/\.[^.]+$/,'');
 function pickedFiles(files){
@@ -2037,6 +2085,168 @@ function bind3D(){
   };
 }
 
+/* ======================= Google Drive (read-only, browser to Google directly) ======================= */
+const GD={token:null,exp:0,clientId:store.get('gdClient',''),folder:store.get('gdFolder',null),seen:store.get('gdSeen',{}),stack:[],plan:[],busy:false};
+const GD_SCOPE='https://www.googleapis.com/auth/drive.readonly',GD_FOLDER='application/vnd.google-apps.folder';
+const gdStat=(m,err)=>{const e=$('#gdStat');e.textContent=m||'';e.classList.toggle('err',!!err);};
+function gdUiState(){
+  const connected=!!GD.token&&Date.now()<GD.exp;
+  $('#gdClient').value=GD.clientId;
+  $('#gdConnect').textContent=connected?'Reconnect':'Connect Google Drive';
+  $('#gdPick').hidden=!(connected||GD.folder);$('#gdSync').hidden=!GD.folder;
+  $('#gdPick').textContent=GD.folder?'Change folder…':'Choose folder…';
+  $('#gdSync').textContent=GD.folder?`Sync from “${GD.folder.name}”`:'Sync from folder';
+}
+async function gdAuth(){
+  if(GD.token&&Date.now()<GD.exp-60000)return GD.token;
+  if(location.protocol==='file:')throw new Error('Google sign-in needs an https:// or http://localhost address; it cannot run from a page opened as a local file.');
+  if(!GD.clientId)throw new Error('Paste your OAuth Client ID first (see “One-time setup”).');
+  if(!(window.google&&google.accounts&&google.accounts.oauth2))await loadScript('https://accounts.google.com/gsi/client');
+  return new Promise((res,rej)=>{
+    const tc=google.accounts.oauth2.initTokenClient({client_id:GD.clientId,scope:GD_SCOPE,
+      callback:r=>{if(r.error)return rej(new Error(r.error_description||r.error));GD.token=r.access_token;GD.exp=Date.now()+(+r.expires_in||3600)*1000;gdUiState();res(GD.token);},
+      error_callback:e=>rej(new Error(e&&e.type==='popup_closed'?'Sign-in was closed before it finished.':(e&&e.message)||'Google sign-in failed.'))});
+    tc.requestAccessToken();
+  });
+}
+async function gdFetch(url,retry=true){
+  const tok=await gdAuth(),r=await fetch(url,{headers:{Authorization:'Bearer '+tok}});
+  if(r.status===401&&retry){GD.token=null;return gdFetch(url,false);}
+  if(!r.ok){let t='';try{t=(await r.text()).slice(0,160);}catch(e){}throw new Error(`Google Drive error ${r.status}${t?': '+t:''}`);}
+  return r;
+}
+async function gdList(folderId,onlyFolders){
+  const out=[];let page='';
+  const q=folderId==='shared'?`sharedWithMe=true and trashed=false${onlyFolders?` and mimeType='${GD_FOLDER}'`:''}`
+    :`'${folderId}' in parents and trashed=false${onlyFolders?` and mimeType='${GD_FOLDER}'`:''}`;
+  do{
+    const u=new URL('https://www.googleapis.com/drive/v3/files');
+    u.searchParams.set('q',q);u.searchParams.set('fields','nextPageToken,files(id,name,mimeType,size,modifiedTime)');
+    u.searchParams.set('pageSize','200');u.searchParams.set('orderBy','name');u.searchParams.set('supportsAllDrives','true');u.searchParams.set('includeItemsFromAllDrives','true');
+    if(page)u.searchParams.set('pageToken',page);
+    const j=await (await gdFetch(u.toString())).json();out.push(...(j.files||[]));page=j.nextPageToken||'';
+  }while(page);
+  return out;
+}
+async function gdDownload(f,progress,lo=0,hi=1){
+  const r=await gdFetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(f.id)}?alt=media&supportsAllDrives=true`);
+  const total=+f.size||+r.headers.get('content-length')||0,parts=[];let got=0;
+  if(r.body&&r.body.getReader){
+    const rd=r.body.getReader();
+    for(;;){const {done,value}=await rd.read();if(done)break;parts.push(value);got+=value.length;
+      progress(lo+(hi-lo)*(total?got/total:.5),`Downloading ${f.name}… ${(got/1e6).toFixed(0)} MB${total?' of '+(total/1e6).toFixed(0):''}`);}
+  }else parts.push(new Uint8Array(await r.arrayBuffer()));
+  return new File(parts,f.name,{type:'application/octet-stream'});
+}
+const fmtMB=b=>b>=1e6?(b/1e6).toFixed(0)+' MB':b>=1e3?(b/1e3).toFixed(0)+' kB':(+b||0)+' B';
+// ---- folder browser ----
+async function gdBrowse(){
+  const box=$('#gdBrowser'),list=$('#gdFolders'),top=GD.stack[GD.stack.length-1];
+  box.hidden=false;
+  const crumb=$('#gdCrumb');crumb.innerHTML='';
+  GD.stack.forEach((c,i)=>{if(i)crumb.append(' › ');const b=el('button',{text:c.name});b.onclick=()=>{GD.stack=GD.stack.slice(0,i+1);gdBrowse();};crumb.append(b);});
+  list.innerHTML='<div class="hint" style="padding:8px 10px">Loading…</div>';
+  try{
+    const dirs=await gdList(top.id,true);
+    list.innerHTML='';
+    if(GD.stack.length===1){const b=el('button');b.innerHTML='<span>👥</span><span>Shared with me</span><span class="m"></span>';b.onclick=()=>{GD.stack.push({id:'shared',name:'Shared with me'});gdBrowse();};list.append(b);}
+    for(const d of dirs){const b=el('button');b.innerHTML='<span>📁</span><span></span><span class="m">open ›</span>';b.children[1].textContent=d.name;b.onclick=()=>{GD.stack.push({id:d.id,name:d.name});gdBrowse();};list.append(b);}
+    if(!dirs.length&&GD.stack.length>1)list.innerHTML='<div class="hint" style="padding:8px 10px">No sub-folders here. Use this folder, or go back.</div>';
+    $('#gdUse').disabled=top.id==='shared';
+  }catch(e){list.innerHTML='';gdStat(e.message,true);}
+}
+// ---- scan a folder and build the import plan ----
+async function gdScan(folder){
+  const files=[];let queue=[{id:folder.id,path:''}],depth=0;
+  while(queue.length&&depth<4){
+    const next=[];
+    for(const q of queue){
+      const items=await gdList(q.id,false);
+      for(const it of items){
+        if(it.mimeType===GD_FOLDER)next.push({id:it.id,path:q.path+it.name+'/'});
+        else files.push({...it,path:q.path});
+      }
+      gdStat(`Scanning… ${files.length} files found`);
+    }
+    queue=next;depth++;
+  }
+  return files;
+}
+const gdKind=n=>/\.zip$/i.test(n)?'zip':/\.(gpx|tcx)$/i.test(n)?'track':/\.json$/i.test(n)?'json':/\.fit(\.gz)?$/i.test(n)?'fit':null;
+async function gdSync(){
+  if(!GD.folder)return;
+  gdStat('Connecting…');
+  try{
+    const all=await gdScan(GD.folder);
+    const files=all.map(f=>({...f,kind:gdKind(f.name)})).filter(f=>f.kind);
+    const newest=k=>files.filter(f=>f.kind===k).sort((a,b)=>b.modifiedTime.localeCompare(a.modifiedTime))[0];
+    const nz=newest('zip'),nj=newest('json');
+    const plan=files.map(f=>({f,use:f.kind==='track'||(f.kind==='zip'&&f===nz)||(f.kind==='json'&&f===nj),fresh:GD.seen[f.id]!==f.modifiedTime}));
+    GD.plan=plan;
+    const fits=files.filter(f=>f.kind==='fit').length;
+    $('#gdPlanHead').textContent=`${files.length} usable file${files.length===1?'':'s'} in “${GD.folder.name}”`+
+      (fits?` (${fits} .fit file${fits>1?'s':''} ignored: not supported yet)`:'')+`. Several weekly exports are the same data, so only the newest .zip and newest .json are ticked.`;
+    const host=$('#gdFiles');host.innerHTML='';
+    const rank={zip:0,json:1,track:2,fit:3},sorted=plan.filter(p=>p.f.kind!=='fit').sort((a,b)=>rank[a.f.kind]-rank[b.f.kind]||b.f.modifiedTime.localeCompare(a.f.modifiedTime));
+    if(!sorted.length){host.innerHTML='<div class="hint" style="padding:8px 10px">No .zip, .gpx, .tcx or .json files found in this folder.</div>';}
+    const trackN=sorted.filter(p=>p.f.kind==='track').length;
+    for(const p of sorted.filter(p=>p.f.kind!=='track'||trackN<=60)){
+      const l=el('label'),cb=el('input',{type:'checkbox'});cb.checked=p.use;cb.onchange=()=>{p.use=cb.checked;};
+      const nm=el('span',{text:p.f.path+p.f.name});
+      l.append(cb,nm,el('span',{class:'m',text:`${fmtMB(p.f.size)} · ${p.f.modifiedTime.slice(0,10)}${p.fresh?'':' · imported'}`}));
+      host.append(l);
+    }
+    if(trackN>60){ // many activity files: one summary row instead of hundreds
+      const t=sorted.filter(p=>p.f.kind==='track'),l=el('label'),cb=el('input',{type:'checkbox'});cb.checked=true;
+      cb.onchange=()=>t.forEach(p=>p.use=cb.checked);
+      l.append(cb,el('span',{text:`${trackN} GPX / TCX activity files`}),el('span',{class:'m',text:`${fmtMB(t.reduce((a,p)=>a+(+p.f.size||0),0))} · ${t.filter(p=>p.fresh).length} new`}));
+      host.append(l);
+    }
+    $('#gdPlan').hidden=false;gdStat('');
+  }catch(e){gdStat(e.message,true);}
+}
+async function gdImport(){
+  if(GD.busy)return;GD.busy=true;
+  const sel=GD.plan.filter(p=>p.use),replace=$('#gdReplace').checked,fname=GD.folder.name;
+  try{
+    const zips=sel.filter(p=>p.f.kind==='zip'),jsons=sel.filter(p=>p.f.kind==='json'),tracks=sel.filter(p=>p.f.kind==='track');
+    if(!sel.length){gdStat('Nothing ticked.',true);GD.busy=false;return;}
+    for(const p of zips){
+      await runImport(p.f.name,async prog=>{const file=await gdDownload(p.f,prog,0,.5);return importZip(file,(fr,m)=>prog(.5+.5*fr,m));},
+        {name:`Drive · ${fname} · Apple Health`,replace});
+      GD.seen[p.f.id]=p.f.modifiedTime;
+    }
+    for(const p of jsons){
+      await runImport(p.f.name,async prog=>{const file=await gdDownload(p.f,prog,0,.5);return importGoogleTimeline(file,(fr,m)=>prog(.5+.5*fr,m));},
+        {name:`Drive · ${fname} · location history`,replace});
+      GD.seen[p.f.id]=p.f.modifiedTime;
+    }
+    if(tracks.length){
+      await runImport(fname,async prog=>{
+        const files=[];
+        for(let i=0;i<tracks.length;i++){files.push(await gdDownload(tracks[i].f,(fr,m)=>prog(.5*(i+fr)/tracks.length,`${m} (${i+1}/${tracks.length})`),0,1));}
+        return importFiles(files,(fr,m)=>prog(.5+.5*fr,m));
+      },{name:`Drive · ${fname} · activities`,replace});
+      for(const p of tracks)GD.seen[p.f.id]=p.f.modifiedTime;
+    }
+    store.set('gdSeen',GD.seen);
+    $('#gdPlan').hidden=true;
+  }catch(e){setStatus(e.message||String(e),true);}
+  GD.busy=false;
+}
+function bindDrive(){
+  $('#gdClient').value=GD.clientId;
+  $('#gdClient').addEventListener('change',e=>{GD.clientId=e.target.value.trim();store.set('gdClient',GD.clientId);GD.token=null;gdUiState();});
+  $('#gdConnect').onclick=async()=>{try{gdStat('Opening Google sign-in…');GD.clientId=$('#gdClient').value.trim();store.set('gdClient',GD.clientId);GD.token=null;await gdAuth();gdStat('Connected. Choose the folder that holds your uploads.');gdUiState();}catch(e){gdStat(e.message,true);}};
+  $('#gdPick').onclick=async()=>{try{await gdAuth();GD.stack=[{id:'root',name:'My Drive'}];await gdBrowse();}catch(e){gdStat(e.message,true);}};
+  $('#gdCancel').onclick=()=>{$('#gdBrowser').hidden=true;};
+  $('#gdUse').onclick=()=>{const t=GD.stack[GD.stack.length-1];if(t.id==='shared')return;GD.folder={id:t.id,name:t.name};store.set('gdFolder',GD.folder);$('#gdBrowser').hidden=true;gdUiState();gdStat(`Folder set to “${t.name}”. Click Sync to see what is in it.`);};
+  $('#gdSync').onclick=()=>gdSync();
+  $('#gdImport').onclick=gdImport;
+  $('#gdPlanClose').onclick=()=>{$('#gdPlan').hidden=true;};
+  gdUiState();
+}
+
 /* ======================= wiring ======================= */
 function bindRange(id,key,fmt,after){
   const i=$('#'+id),o=$('#'+id+'o');i.value=S[key];o.textContent=fmt(S[key]);
@@ -2141,7 +2351,7 @@ async function boot(){
   $('#cmpSep').onchange=e=>{CMP.sep=e.target.checked;store.set('cmpSep',CMP.sep);filterVersion++;redraw();};
   $('#cmpSwap').onclick=()=>{const t=CMP.A;CMP.A=CMP.B;CMP.B=t;buildCompareUI();scheduleUpdate();};
   $('#sidebtn').onclick=()=>document.body.classList.toggle('side-open');
-  bind3D();
+  bind3D();bindDrive();
   document.addEventListener('keydown',e=>{if(e.key==='Escape')setSelected(null);});
   let moveTimer=0;
   map.on('move zoom resize',redraw);
@@ -2154,7 +2364,7 @@ async function boot(){
   renderDsList();
   if(!DS.length)dlg.showModal();
 }
-window.WorkoutAtlas={map,draw,F,S,CMP,P,DS,X3,x3Field,x3STL,open3D,importZip,importFiles,importGoogleTimeline,addDataset,rebuildAll,get W(){return W;}};
+window.WorkoutAtlas={map,draw,F,S,CMP,P,DS,GD,gdSync,gdImport,gdBrowse,X3,x3Field,x3STL,open3D,importZip,importFiles,importGoogleTimeline,addDataset,rebuildAll,get W(){return W;}};
 window.addEventListener('resize',()=>{map.invalidateSize();});
 boot();
 })();

@@ -30,3 +30,9 @@
 - **Not done:** FIT, the binary format of Garmin bulk exports and Strava's `.fit.gz`. A parser would live next to
   `processTcx` in `index.html` and emit the same track summary. Selections containing `.fit` files now say how many
   were skipped, instead of ignoring them silently.
+
+## Google Drive
+
+- **Done:** pick a folder, scan sub-folders, import newest zip / json and all GPX / TCX, replace on re-sync.
+- **Not done:** automatic background sync (the page has to be open and you click Sync), remembering a Drive
+  login across sessions (Google tokens last an hour), importing only changed activity files instead of all of them.
